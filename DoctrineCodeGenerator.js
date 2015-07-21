@@ -38,7 +38,7 @@ define(function(require, exports, module) {
     var CodeGenUtils = require("CodeGenUtils");
 
     // constant for separate namespace on code
-    var SEPARATE_NAMESPACE = "\\";
+    var NAMESPACE_SEPARATOR = "\\";
 
     /**
      * Doctrine Code Generator
@@ -277,16 +277,16 @@ define(function(require, exports, module) {
                 _type = elem.reference.name;
                 _namespace = _.map(this.getNamespaces(elem.reference), function(e) {
                     return e;
-                }).join(SEPARATE_NAMESPACE);
-                _type = SEPARATE_NAMESPACE + _namespace + SEPARATE_NAMESPACE + _type;
+                }).join(NAMESPACE_SEPARATOR);
+                _type = NAMESPACE_SEPARATOR + _namespace + NAMESPACE_SEPARATOR + _type;
             }
         } else {
             if (elem.type instanceof type.UMLModelElement && elem.type.name.length > 0) {
                 _type = elem.type.name;
                 _namespace = _.map(this.getNamespaces(elem.type), function(e) {
                     return e;
-                }).join(SEPARATE_NAMESPACE);
-                _type = SEPARATE_NAMESPACE + _namespace + SEPARATE_NAMESPACE + _type;
+                }).join(NAMESPACE_SEPARATOR);
+                _type = NAMESPACE_SEPARATOR + _namespace + NAMESPACE_SEPARATOR + _type;
             } else if (_.isString(elem.type) && elem.type.length > 0) {
                 _type = elem.type;
             }
@@ -332,6 +332,16 @@ define(function(require, exports, module) {
             }
         }
     };
+    
+    DoctrineCodeGenerator.prototype.getNamespace = function(elem) {
+        var path = null;
+        if (elem._parent) {
+            path = _.map(elem._parent.getPath(this.baseModel), function(e) {
+                return e.name;
+            }).join(NAMESPACE_SEPARATOR);
+        }
+        return path;
+    };
 
     /**
      * Write Package Declaration
@@ -340,12 +350,7 @@ define(function(require, exports, module) {
      * @param {Object} options     
      */
     DoctrineCodeGenerator.prototype.writeNamespaceDeclaration = function(codeWriter, elem, options) {
-        var path = null;
-        if (elem._parent) {
-            path = _.map(elem._parent.getPath(this.baseModel), function(e) {
-                return e.name;
-            }).join(SEPARATE_NAMESPACE);
-        }
+        var path = this.getNamespaces(elem);
         if (path) {
             codeWriter.writeLine("namespace " + path + ";\n");
         }
@@ -400,20 +405,29 @@ define(function(require, exports, module) {
     DoctrineCodeGenerator.prototype.writeMemberVariable = function(codeWriter, elem, options) {
         if (elem.name.length > 0) {
             var terms = [];
-            // doc
+            
+            // PHPDoc + Annotations
             var doc = "@var " + this.getType(elem) + " " + elem.documentation.trim();
             if (true) {
-                // Annotations
-                doc += "\n\n@ORM\\Column(name=\"" + elem.name + "\", type=\"" + elem.type + "\")";
+                terms.push("name=\"" + elem.name + "\"");
+                terms.push("type=\"" + elem.type + "\"");
+                if (elem.type == "string") {
+                    terms.push("length=255");
+                }
+                if (elem.isUnique) {
+                    terms.push("unique=\"true\"");
+                }
+                doc += "\n\n@ORM\\Column(" + terms.join(", ") + ")";
                 
                 if (elem.isId) {
                     doc += "\n@ORM\\Id";
-                    doc += "\n@ORM\\GeneratedValue(strategy=\"IDENTITY\")";
+                    doc += "\n@ORM\\GeneratedValue(strategy=\"AUTO\")";
                 }
             }
             this.writeDoc(codeWriter, doc, options);
 
             // modifiers const
+            var terms = [];
             if (elem.isFinalSpecification === true || elem.isLeaf === true) {
                 terms.push("const " + elem.name.toUpperCase());
             }
@@ -437,16 +451,43 @@ define(function(require, exports, module) {
     
     DoctrineCodeGenerator.prototype.writeSettersAndGetters = function(codeWriter, elem, options) {
         if (elem.name.length > 0) {
-            // GETTER
+            // SETTER
             var terms = [];
-            console.log(elem);
             
             // Documentation
-            var doc = elem.documentation.trim();
+            var doc =  "Set " + elem.name;
             if (elem.type) {
-                doc += "\n\n@return " + elem.type + " " + elem.documentation;
+                doc += "\n\n\@param " + elem.type + " " + elem.name + " " + elem.documentation.trim();
             } else {
-                doc += "\n\n@return type " + elem.documentation;
+                doc += "\n\n\@param type " + elem.name + " " + elem.documentation.trim();
+            }
+            this.writeDoc(codeWriter, doc, options);
+
+            terms.push("public function");
+
+            // name
+            terms.push("set" + elem.name.capitalize() + "($" + elem.name + ")");
+
+            // body
+            codeWriter.writeLine(terms.join(" "));
+            codeWriter.writeLine("{");
+            codeWriter.indent();
+
+            codeWriter.writeLine("$this->" + elem.name + " = $" + elem.name + ";");
+
+            codeWriter.outdent();
+            codeWriter.writeLine("}");
+            codeWriter.writeLine();
+            
+            // GETTER
+            var terms = [];
+            
+            // Documentation
+            var doc = "Get " + elem.name;
+            if (elem.type) {
+                doc += "\n\n@return " + elem.type + " " + elem.documentation.trim();
+            } else {
+                doc += "\n\n@return type " + elem.documentation.trim();
             }
             this.writeDoc(codeWriter, doc, options);
 
@@ -462,32 +503,6 @@ define(function(require, exports, module) {
 
             //spacification
             codeWriter.writeLine("return $this->" + elem.name + ";");
-
-            codeWriter.outdent();
-            codeWriter.writeLine("}");
-            codeWriter.writeLine();
-            
-            // SETTER
-            var terms = [];
-            
-            // Documentation
-            var doc = elem.documentation.trim();
-            if (elem.type) {
-                //doc += "\n@return " + elem.type + " " + elem.documentation;
-            }
-            this.writeDoc(codeWriter, doc, options);
-
-            terms.push("public function");
-
-            // name
-            terms.push("set" + elem.name.capitalize() + "($" + elem.name + ")");
-
-            // body
-            codeWriter.writeLine(terms.join(" "));
-            codeWriter.writeLine("{");
-            codeWriter.indent();
-
-            codeWriter.writeLine("$this->" + elem.name + " = $" + elem.name + ";");
 
             codeWriter.outdent();
             codeWriter.writeLine("}");
@@ -658,15 +673,20 @@ define(function(require, exports, module) {
     DoctrineCodeGenerator.prototype.writeClass = function(codeWriter, elem, options) {
         var i, len, terms = [];
 
-        // Doc
-        var doc = elem.documentation.trim();
+        // PHPDoc + Annotations
+        var doc = this.getNamespaces(elem) + NAMESPACE_SEPARATOR + elem.name;
+        if (elem.documentation) {
+            doc += "\n\n" + elem.documentation.trim();
+        }
         if (ProjectManager.getProject().author && ProjectManager.getProject().author.length > 0) {
             doc += "\n@author " + ProjectManager.getProject().author;
         }
-        doc += "\n\n@ORM\\Entity\n@ORM\\Table(name=\"" + elem.name.toUnderscore() + "\")";
+        if (true) {
+            doc += "\n\n@ORM\\Entity\n@ORM\\Table(name=\"" + elem.name.toUnderscore() + "\")";
+        }
         this.writeDoc(codeWriter, doc, options);
 
-        // Modifiers
+        // Class Modifiers
         var _modifiers = this.getModifiersClass(elem);
         if (_modifiers.length > 0) {
             terms.push(_modifiers.join(" "));
@@ -717,10 +737,10 @@ define(function(require, exports, module) {
         }
         
         // Constructor
-        this.writeConstructor(codeWriter, elem, options);
-        codeWriter.writeLine();
+        //this.writeConstructor(codeWriter, elem, options);
+        //codeWriter.writeLine();
 
-        // Getters & Setters
+        // Setters & Getters
         if (true) {
             for (i = 0, len = elem.attributes.length; i < len; i++) {
                 this.writeSettersAndGetters(codeWriter, elem.attributes[i], options, false, false);
