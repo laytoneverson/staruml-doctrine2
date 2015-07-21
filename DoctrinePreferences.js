@@ -29,6 +29,12 @@ define(function (require, exports, module) {
             text: "Doctrine 2 Code Generation",
             type: "Section"
         },
+		"doctrine.gen.mapping": {
+            text: "Mapping",
+            description: "Type of mapping.",
+            type: "Check",
+            default: true
+        },
         "doctrine.gen.phpDoc": {
             text: "PHPDoc",
             description: "Generate PHPDoc comments.",
@@ -49,13 +55,13 @@ define(function (require, exports, module) {
         },
         "doctrine.gen.classExtension": {
             text: "Append to class filename",
-            description: "Insert value into class filename extensions (e.g. MyClass.class.php)",
+            description: "Insert value into class filename extensions (e.g. MyClass.class.php).",
             type: "String",
             default: ".class"
         },
         "doctrine.gen.interfaceExtension": {
             text: "Append to interface filename",
-            description: "Insert value into interface filename extensions (e.g. MyInterface.interface.php)",
+            description: "Insert value into interface filename extensions (e.g. MyInterface.interface.php).",
             type: "String",
             default: ".interface"
         },
@@ -77,19 +83,19 @@ define(function (require, exports, module) {
         },
         "doctrine.rev.typeHierarchy": {
             text: "Type Hierarchy Diagram",
-            description: "Create a type hierarchy diagram for all classes and interfaces",
+            description: "Create a type hierarchy diagram for all classes and interfaces.",
             type: "Check",
             default: true
         },
         "doctrine.rev.packageOverview": {
             text: "Package Overview Diagram",
-            description: "Create overview diagram for each package",
+            description: "Create overview diagram for each package.",
             type: "Check",
             default: true
         },
         "doctrine.rev.packageStructure": {
             text: "Package Structure Diagram",
-            description: "Create a package structure diagram for all packages",
+            description: "Create a package structure diagram for all packages.",
             type: "Check",
             default: true
         }
@@ -101,9 +107,10 @@ define(function (require, exports, module) {
 
     function getGenOptions() {
         return {
-            phpDoc       : PreferenceManager.get("doctrine.gen.phpDoc"),
-            useTab        : PreferenceManager.get("doctrine.gen.useTab"),
-            indentSpaces  : PreferenceManager.get("doctrine.gen.indentSpaces"),
+            phpDoc         : PreferenceManager.get("doctrine.gen.phpDoc"),
+            mapping        : PreferenceManager.get("doctrine.gen.mapping"),
+            useTab         : PreferenceManager.get("doctrine.gen.useTab"),
+            indentSpaces   : PreferenceManager.get("doctrine.gen.indentSpaces"),
             classExtension : PreferenceManager.get("doctrine.gen.classExtension"),
             interfaceExtension : PreferenceManager.get("doctrine.gen.interfaceExtension")
         };

@@ -3,6 +3,8 @@ Doctrine 2 Extension for StarUML 2
 
 This extension for StarUML (http://staruml.io) support to generate PHP code for Doctrine 2 from UML model. Install this extension from Extension Manager of StarUML.
 
+(this is a work in progress)
+
 Doctrine 2 Code Generation
 --------------------------
 
