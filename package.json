@@ -3,7 +3,7 @@
     "title": "Doctrine 2",
     "description": "PHP code generation for Doctrine 2 ORM.",
     "homepage": "https://github.com/radicaldingos/staruml-doctrine2",
-    "keywords": ["php", "doctrine"],
+    "keywords": ["php", "doctrine", "symfony"],
     "version": "0.0.1",
     "author": {
         "name": "Radical Dingos",

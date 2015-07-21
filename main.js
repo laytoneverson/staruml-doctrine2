@@ -21,7 +21,7 @@
  *
  */
 
-/*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50, regexp: true */
+/*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50, regexp: true*/
 /*global define, $, _, window, app, type, appshell, document */
 
 define(function (require, exports, module) {
@@ -40,7 +40,7 @@ define(function (require, exports, module) {
         ExtensionUtils      = app.getModule("utils/ExtensionUtils"),
         UML                 = app.getModule("uml/UML");
 
-    var CodeGenUtils        = require("CodeGenUtils"),
+    var CodeGenUtils            = require("CodeGenUtils"),
         DoctrinePreferences     = require("DoctrinePreferences"),
         DoctrineCodeGenerator   = require("DoctrineCodeGenerator");
 
