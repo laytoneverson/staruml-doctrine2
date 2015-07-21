@@ -107,11 +107,11 @@ define(function (require, exports, module) {
 
     function getGenOptions() {
         return {
-            phpDoc         : PreferenceManager.get("doctrine.gen.phpDoc"),
-            mapping        : PreferenceManager.get("doctrine.gen.mapping"),
-            useTab         : PreferenceManager.get("doctrine.gen.useTab"),
-            indentSpaces   : PreferenceManager.get("doctrine.gen.indentSpaces"),
-            classExtension : PreferenceManager.get("doctrine.gen.classExtension"),
+            phpDoc             : PreferenceManager.get("doctrine.gen.phpDoc"),
+            mapping            : PreferenceManager.get("doctrine.gen.mapping"),
+            useTab             : PreferenceManager.get("doctrine.gen.useTab"),
+            indentSpaces       : PreferenceManager.get("doctrine.gen.indentSpaces"),
+            classExtension     : PreferenceManager.get("doctrine.gen.classExtension"),
             interfaceExtension : PreferenceManager.get("doctrine.gen.interfaceExtension")
         };
     }
