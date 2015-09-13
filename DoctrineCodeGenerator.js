@@ -90,7 +90,13 @@ define(function(require, exports, module) {
 
         // Package
         if (elem instanceof type.UMLPackage) {
-            fullPath = path + "/" + elem.name;
+            fullPath = path + "/" + elem.name.toUpperCamelCase();
+            if (options.bundleSuffix) {
+                fullPath += options.bundleSuffix;
+            }
+            if (options.entityFolder) {
+                fullPath += "/" + options.entityFolder;
+            }
             directory = FileSystem.getDirectoryForPath(fullPath);
             directory.create(function(err, stat) {
                 if (!err) {
@@ -106,7 +112,6 @@ define(function(require, exports, module) {
                 }
             });
         } else if (elem instanceof type.UMLClass) {
-
             // AnnotationType
             if (elem.stereotype === "annotationType") {
                 fullPath = path + "/" + elem.name + ".php";
@@ -117,10 +122,9 @@ define(function(require, exports, module) {
                 this.writeAnnotationType(codeWriter, elem, options);
                 file = FileSystem.getFileForPath(fullPath);
                 FileUtils.writeText(file, codeWriter.getData(), true).then(result.resolve, result.reject);
-
-                // Class
             } else {
-                fullPath = path + "/" + elem.name + options.classExtension + ".php";
+                // Class
+                fullPath = path + "/" + elem.name + ".php";
                 codeWriter = new CodeGenUtils.CodeWriter(this.getIndentString(options));
                 codeWriter.writeLine("<?php\n");
                 this.writeNamespaceDeclaration(codeWriter, elem, options);
@@ -132,7 +136,7 @@ define(function(require, exports, module) {
 
             // Interface
         } else if (elem instanceof type.UMLInterface) {
-            fullPath = path + "/" + elem.name + options.interfaceExtension + ".php";
+            fullPath = path + "/" + elem.name + ".php";
             codeWriter = new CodeGenUtils.CodeWriter(this.getIndentString(options));
             codeWriter.writeLine("<?php\n");
             this.writeNamespaceDeclaration(codeWriter, elem, options);
@@ -252,12 +256,16 @@ define(function(require, exports, module) {
      * @param {type.Model} elem
      * @return {Array}
      */
-    DoctrineCodeGenerator.prototype.getNamespaces = function(elem) {
+    DoctrineCodeGenerator.prototype.getNamespaces = function(elem, options) {
         var _namespace = [];
         var _parent = [];
         if (elem._parent instanceof type.UMLPackage && !(elem._parent instanceof type.UMLModel)) {
-            _namespace.push(elem._parent.name);
-            _parent = this.getNamespaces(elem._parent);
+            if (options.bundleSuffix) {
+                _namespace.push(elem._parent.name + options.bundleSuffix);
+            } else {
+                _namespace.push(elem._parent.name);
+            }
+            _parent = this.getNamespaces(elem._parent, options);
         }
 
         return _.union(_parent, _namespace);
@@ -268,14 +276,14 @@ define(function(require, exports, module) {
      * @param {type.Model} elem
      * @return {string}
      */
-    DoctrineCodeGenerator.prototype.getType = function(elem) {
+    DoctrineCodeGenerator.prototype.getType = function(elem, options) {
         var _type = "void";
         var _namespace = "";
         // type name
         if (elem instanceof type.UMLAssociationEnd) {
             if (elem.reference instanceof type.UMLModelElement && elem.reference.name.length > 0) {
                 _type = elem.reference.name;
-                _namespace = _.map(this.getNamespaces(elem.reference), function(e) {
+                _namespace = _.map(this.getNamespaces(elem.reference, options), function(e) {
                     return e;
                 }).join(NAMESPACE_SEPARATOR);
                 _type = NAMESPACE_SEPARATOR + _namespace + NAMESPACE_SEPARATOR + _type;
@@ -283,7 +291,7 @@ define(function(require, exports, module) {
         } else {
             if (elem.type instanceof type.UMLModelElement && elem.type.name.length > 0) {
                 _type = elem.type.name;
-                _namespace = _.map(this.getNamespaces(elem.type), function(e) {
+                _namespace = _.map(this.getNamespaces(elem.type, options), function(e) {
                     return e;
                 }).join(NAMESPACE_SEPARATOR);
                 _type = NAMESPACE_SEPARATOR + _namespace + NAMESPACE_SEPARATOR + _type;
@@ -350,7 +358,7 @@ define(function(require, exports, module) {
      * @param {Object} options     
      */
     DoctrineCodeGenerator.prototype.writeNamespaceDeclaration = function(codeWriter, elem, options) {
-        var path = this.getNamespaces(elem);
+        var path = this.getNamespaces(elem, options);
         if (path) {
             codeWriter.writeLine("namespace " + path + ";\n");
         }
@@ -382,7 +390,7 @@ define(function(require, exports, module) {
             if (!haveConstruct)
             {
                 var terms = [];
-                // Doc
+                // PHPDoc
                 this.writeDoc(codeWriter, elem.documentation, options);
                 // Visibility
                 var visibility = this.getVisibility(elem);
@@ -395,6 +403,17 @@ define(function(require, exports, module) {
             }
         }
     };
+    
+    DoctrineCodeGenerator.prototype.writePK = function(codeWriter, elem, options) {
+        if (options.defaultPk
+            && options.mapping === "0"
+        ) {
+            var doc = "@ORM\\Id\n@ORM\\Column(type=integer)\n@ORM\\GeneratedValue(strategy=\"AUTO\")";
+            this.writeDoc(codeWriter, doc, options);
+            
+            codeWriter.writeLine("protected $id;");
+        }
+    }
 
     /**
      * Write Member Variable
@@ -407,10 +426,14 @@ define(function(require, exports, module) {
             var terms = [];
             
             // PHPDoc + Annotations
-            var doc = "@var " + this.getType(elem) + " " + elem.documentation.trim();
-            if (true) {
+            var doc = "@var " + this.getType(elem, options) + " " + elem.documentation.trim();
+            if (options.mapping === "0") {
                 terms.push("name=\"" + elem.name + "\"");
-                terms.push("type=\"" + elem.type + "\"");
+                if (elem.type) {
+                    terms.push("type=\"" + elem.type + "\"");
+                } else {
+                    terms.push("type=\"" + options.unknownType + "\"");
+                }
                 if (elem.type == "string") {
                     terms.push("length=255");
                 }
@@ -445,6 +468,112 @@ define(function(require, exports, module) {
             if (elem.defaultValue && elem.defaultValue.length > 0) {
                 terms.push("= " + elem.defaultValue);
             }
+            codeWriter.writeLine(terms.join(" ") + ";");
+        }
+    };
+    
+    DoctrineCodeGenerator.prototype.writeManyToOneAssociationDoc = function(codeWriter, elem, options) {
+        var doc = "@ManyToOne(targetEntity=\"" + elem.reference.name + "\")";
+        doc += "\n@JoinColumn(name=\"" + elem.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
+        
+        this.writeDoc(codeWriter, doc, options);
+    }
+    
+    DoctrineCodeGenerator.prototype.writeOneToManyAssociationDoc = function(codeWriter, elem, options) {
+        var doc = "@OneToMany(targetEntity=\"" + elem.reference.name + "\")";
+        doc += "\n@JoinColumn(name=\"" + elem.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
+        
+        this.writeDoc(codeWriter, doc, options);
+    }
+    
+    DoctrineCodeGenerator.prototype.writeManyToManyAssociationDoc = function(codeWriter, elem, options) {
+        var doc = "@ManyToMany(targetEntity=\"" + elem.reference.name + "\", inversedBy=\"\")";
+        doc += "\n@JoinTable(name=\"" + elem.reference.name.toUnderscore() + "_\")";
+        
+        this.writeDoc(codeWriter, doc, options);
+    }
+    
+    DoctrineCodeGenerator.prototype.writeOneToOneAssociationDoc = function(codeWriter, elem, options) {
+        var doc = "@OneToOne(targetEntity=\"" + elem.reference.name + "\")";
+        doc += "\n@JoinColumn(name=\"" + elem.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
+        
+        this.writeDoc(codeWriter, doc, options);
+    }
+    
+    DoctrineCodeGenerator.prototype.getAssociationType = function(sourceEnd, targetEnd) {
+        var ret;
+        if (sourceEnd.multiplicity == "0..*" && targetEnd.multiplicity == "1") {
+            ret = "ManyToOne";
+        } else if (sourceEnd.multiplicity == "1" && targetEnd.multiplicity == "0..*") {
+            ret = "OneToMany";
+        } else if (sourceEnd.multiplicity == "0..*" && targetEnd.multiplicity == "0..*") {
+            ret = "ManyToMany";
+        } else if (sourceEnd.multiplicity == "1" && targetEnd.multiplicity == "1") {
+            ret = "OneToOne";
+        } else {
+            // Par défaut
+            ret = "OneToOne";
+        }
+        
+        return ret;
+    }
+    
+    /**
+     * Write Association
+     * @param {StringWriter} codeWriter
+     * @param {type.Model} elem
+     * @param {Object} options     
+     */
+    DoctrineCodeGenerator.prototype.writeAssociation = function(codeWriter, elem, clazz, options) {
+        if (elem instanceof type.UMLAssociation) {
+            var terms = [];
+            var sourceEnd;
+            var targetEnd;
+            
+            // We determine which end is connected to the class
+            if (elem.end1.reference.name === clazz.name) {
+                sourceEnd = elem.end1;
+                targetEnd = elem.end2;
+            } else {
+                sourceEnd = elem.end2;
+                targetEnd = elem.end1;
+            }
+            
+            var associationType = this.getAssociationType(sourceEnd, targetEnd);
+            
+            // PHPDoc + Annotations
+            if (options.mapping === "0") {
+                //console.log(sourceEnd.reference.name + " " + targetEnd.reference.name);
+                switch (associationType) {
+                    case "ManyToOne":
+                        this.writeManyToOneAssociationDoc(codeWriter, targetEnd, options);
+                        break;
+                    case "OneToMany":
+                        this.writeOneToManyAssociationDoc(codeWriter, targetEnd, options);
+                        break;
+                    case "ManyToMany":
+                        this.writeManyToManyAssociationDoc(codeWriter, targetEnd, options);
+                        break;
+                    case "OneToOne":
+                        this.writeOneToOneAssociationDoc(codeWriter, targetEnd, options);
+                        break;
+                }
+            }
+
+            // modifiers const
+            var terms = [];
+
+            // modifiers
+            var _modifiers = this.getModifiers(elem);
+            if (_modifiers.length > 0) {
+                terms.push(_modifiers.join(" "));
+            }
+            // name
+            if (associationType == "ManyToMany" || associationType == "OneToMany") {
+                terms.push("$" + targetEnd.reference.name.lowerFirstLetter() + "s");
+            } else {
+                terms.push("$" + targetEnd.reference.name.lowerFirstLetter());
+            }            
             codeWriter.writeLine(terms.join(" ") + ";");
         }
     };
@@ -527,10 +656,10 @@ define(function(require, exports, module) {
             // doc
             var doc = elem.documentation.trim();
             _.each(params, function(param) {
-                doc += "\n@param " + _that.getType(param) + " $" + param.name + " " + param.documentation;
+                doc += "\n@param " + _that.getType(param, options) + " $" + param.name + " " + param.documentation;
             });
             if (returnParam) {
-                doc += "\n@return " + this.getType(returnParam) + " " + returnParam.documentation;
+                doc += "\n@return " + this.getType(returnParam, options) + " " + returnParam.documentation;
             }
             this.writeDoc(codeWriter, doc, options);
 
@@ -571,7 +700,7 @@ define(function(require, exports, module) {
 
                     // return statement
                     if (returnParam) {
-                        var returnType = this.getType(returnParam);
+                        var returnType = this.getType(returnParam, options);
                         if (returnType === "boolean") {
                             codeWriter.writeLine("return false;");
                         } else if (returnType === "int" || returnType === "long" || returnType === "short" || returnType === "byte") {
@@ -622,10 +751,10 @@ define(function(require, exports, module) {
             // doc
             var doc = _method.documentation.trim();
             _.each(params, function(param) {
-                doc += "\n@param " + _that.getType(param) + " " + param.name + " " + param.documentation;
+                doc += "\n@param " + _that.getType(param, options) + " " + param.name + " " + param.documentation;
             });
             if (returnParam) {
-                doc += "\n@return " + this.getType(returnParam) + " " + returnParam.documentation;
+                doc += "\n@return " + this.getType(returnParam, options) + " " + returnParam.documentation;
             }
             this.writeDoc(codeWriter, doc, options);
 
@@ -666,6 +795,7 @@ define(function(require, exports, module) {
 
     /**
      * Write Class
+     * 
      * @param {StringWriter} codeWriter
      * @param {type.Model} elem
      * @param {Object} options     
@@ -674,14 +804,14 @@ define(function(require, exports, module) {
         var i, len, terms = [];
 
         // PHPDoc + Annotations
-        var doc = this.getNamespaces(elem) + NAMESPACE_SEPARATOR + elem.name;
+        var doc = this.getNamespaces(elem, options) + NAMESPACE_SEPARATOR + elem.name;
         if (elem.documentation) {
             doc += "\n\n" + elem.documentation.trim();
         }
         if (ProjectManager.getProject().author && ProjectManager.getProject().author.length > 0) {
             doc += "\n@author " + ProjectManager.getProject().author;
         }
-        if (true) {
+        if (options.mapping === "0") {
             doc += "\n\n@ORM\\Entity\n@ORM\\Table(name=\"" + elem.name.toUnderscore() + "\")";
         }
         this.writeDoc(codeWriter, doc, options);
@@ -716,24 +846,22 @@ define(function(require, exports, module) {
         codeWriter.indent();
 
         // Member Variables
-        // (from attributes)
+        // from attributes
+        // Add "id" as PK
+        this.writePK(codeWriter, elem.attributes[i], options);
+        codeWriter.writeLine();
         for (i = 0, len = elem.attributes.length; i < len; i++) {
             this.writeMemberVariable(codeWriter, elem.attributes[i], options);
             codeWriter.writeLine();
         }
+        
         // (from associations)
         var associations = Repository.getRelationshipsOf(elem, function(rel) {
             return (rel instanceof type.UMLAssociation);
-        });
+        });        
         for (i = 0, len = associations.length; i < len; i++) {
-            var asso = associations[i];
-            if (asso.end1.reference === elem && asso.end2.navigable === true) {
-                this.writeMemberVariable(codeWriter, asso.end2, options);
-                codeWriter.writeLine();
-            } else if (asso.end2.reference === elem && asso.end1.navigable === true) {
-                this.writeMemberVariable(codeWriter, asso.end1, options);
-                codeWriter.writeLine();
-            }
+            this.writeAssociation(codeWriter, associations[i], elem, options);
+            codeWriter.writeLine();
         }
         
         // Constructor
@@ -741,10 +869,8 @@ define(function(require, exports, module) {
         //codeWriter.writeLine();
 
         // Setters & Getters
-        if (true) {
-            for (i = 0, len = elem.attributes.length; i < len; i++) {
-                this.writeSettersAndGetters(codeWriter, elem.attributes[i], options, false, false);
-            }
+        for (i = 0, len = elem.attributes.length; i < len; i++) {
+            this.writeSettersAndGetters(codeWriter, elem.attributes[i], options, false, false);
         }
 
         // Methods
@@ -971,6 +1097,16 @@ define(function(require, exports, module) {
     
     String.prototype.capitalize = function() {
         return this.charAt(0).toUpperCase() + this.slice(1);
+    }
+    
+    String.prototype.lowerFirstLetter = function() {
+        return this.charAt(0).toLowerCase() + this.slice(1);
+    }
+    
+    String.prototype.toUpperCamelCase = function() {
+        return this.replace(/(\w)(\w*)/g, function(g0, g1, g2){
+            return g1.toUpperCase() + g2.toLowerCase();
+        }).replace(/\s/g, "");
     }
 
     /**

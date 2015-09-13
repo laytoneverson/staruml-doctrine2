@@ -74,20 +74,9 @@ define(function (require, exports, module) {
 
                         // If path is not assigned, popup Open Dialog to select a folder
                         if (!path) {
-                            FileSystem.showOpenDialog(false, true, "Select a folder where generated codes to be located", null, null, function (err, files) {
-                                if (!err) {
-                                    if (files.length > 0) {
-                                        path = files[0];
-                                        DoctrineCodeGenerator.generate(base, path, options).then(result.resolve, result.reject);
-                                    } else {
-                                        result.reject(FileSystem.USER_CANCELED);
-                                    }
-                                } else {
-                                    result.reject(err);
-                                }
-                            });
+                            _selectFolderDialog(base, options, result);
                         } else {
-                            DoctrineCodeGenerator.generate(base, path, options).then(result.resolve, result.reject);
+                            _generate(base, path, options, result);
                         }
                     } else {
                         result.reject();
@@ -96,23 +85,36 @@ define(function (require, exports, module) {
         } else {
             // If path is not assigned, popup Open Dialog to select a folder
             if (!path) {
-                FileSystem.showOpenDialog(false, true, "Select a folder where generated codes to be located", null, null, function (err, files) {
-                    if (!err) {
-                        if (files.length > 0) {
-                            path = files[0];
-                            DoctrineCodeGenerator.generate(base, path, options).then(result.resolve, result.reject);
-                        } else {
-                            result.reject(FileSystem.USER_CANCELED);
-                        }
-                    } else {
-                        result.reject(err);
-                    }
-                });
+                _selectFolderDialog(base, options, result);
             } else {
-                DoctrineCodeGenerator.generate(base, path, options).then(result.resolve, result.reject);
+                _generate(base, path, options, result);
             }
         }
         return result.promise();
+    }
+    
+    function _selectFolderDialog(base, options, result) {
+        FileSystem.showOpenDialog(false, true, "Select a folder where generated codes to be located", null, null, function (err, files) {
+            if (!err) {
+                _checkFile(base, files, options, result);
+            } else {
+                result.reject(err);
+            }
+        });
+    }
+    
+    function _checkFile(base, files, options, result) {
+        if (files.length > 0) {
+            var path = files[0];
+            _generate(base, path, options, result);
+        } else {
+            result.reject(FileSystem.USER_CANCELED);
+        }
+    }
+    
+    function _generate(base, path, options, result) {
+        DoctrineCodeGenerator.generate(base, path, options).then(result.resolve, result.reject);
+        Dialogs.showInfoDialog("Entities have been successfully generated.");
     }
 
     /**

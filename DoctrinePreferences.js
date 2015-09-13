@@ -29,11 +29,42 @@ define(function (require, exports, module) {
             text: "Doctrine 2 Code Generation",
             type: "Section"
         },
+        "doctrine.gen.bundleSuffix": {
+            text: "Bundle suffix",
+            description: "Suffix appended at the end of package name.",
+            type: "String",
+            default: "Bundle"
+        },
+        "doctrine.gen.entityFolder": {
+            text: "Entity directory",
+            description: "Will be added to the path of generated files.",
+            type: "String",
+            default: "Entity"
+        },
+        "doctrine.gen.defaultPk": {
+            text: "Default PK",
+            description: "Default primary key for entities.",
+            type: "String",
+            default: "id"
+        },
+        "doctrine.gen.unknownType": {
+            text: "Unknown type",
+            description: "Will be used for unknown variable type.",
+            type: "String",
+            default: "void"
+        },
 		"doctrine.gen.mapping": {
             text: "Mapping",
             description: "Type of mapping.",
+            type: "Dropdown",
+            options: [{text: "Annotations", value: 0}],
+            default: 0
+        },
+        "doctrine.gen.setterChaining": {
+            text: "Setters chaining",
+            description: "Make setters return $this.",
             type: "Check",
-            default: true
+            default: false
         },
         "doctrine.gen.phpDoc": {
             text: "PHPDoc",
@@ -52,18 +83,6 @@ define(function (require, exports, module) {
             description: "Number of spaces for indentation.",
             type: "Number",
             default: 4
-        },
-        "doctrine.gen.classExtension": {
-            text: "Append to class filename",
-            description: "Insert value into class filename extensions (e.g. MyClass.class.php).",
-            type: "String",
-            default: ".class"
-        },
-        "doctrine.gen.interfaceExtension": {
-            text: "Append to interface filename",
-            description: "Insert value into interface filename extensions (e.g. MyInterface.interface.php).",
-            type: "String",
-            default: ".interface"
         },
         "doctrine.rev": {
             text: "Doctrine 2 Reverse Engineering",
@@ -107,12 +126,15 @@ define(function (require, exports, module) {
 
     function getGenOptions() {
         return {
+            bundleSuffix       : PreferenceManager.get("doctrine.gen.bundleSuffix"),
+            entityFolder       : PreferenceManager.get("doctrine.gen.entityFolder"),
+            defaultPk          : PreferenceManager.get("doctrine.gen.defaultPk"),
+            unknownType        : PreferenceManager.get("doctrine.gen.unknownType"),
+            setterChaining     : PreferenceManager.get("doctrine.gen.setterChaining"),
             phpDoc             : PreferenceManager.get("doctrine.gen.phpDoc"),
             mapping            : PreferenceManager.get("doctrine.gen.mapping"),
             useTab             : PreferenceManager.get("doctrine.gen.useTab"),
-            indentSpaces       : PreferenceManager.get("doctrine.gen.indentSpaces"),
-            classExtension     : PreferenceManager.get("doctrine.gen.classExtension"),
-            interfaceExtension : PreferenceManager.get("doctrine.gen.interfaceExtension")
+            indentSpaces       : PreferenceManager.get("doctrine.gen.indentSpaces")
         };
     }
 
@@ -127,11 +149,10 @@ define(function (require, exports, module) {
     }
 
     AppInit.htmlReady(function () {
-        PreferenceManager.register(preferenceId, "Doctrine", doctrinePreferences);
+        PreferenceManager.register(preferenceId, "Doctrine 2", doctrinePreferences);
     });
 
     exports.getId         = getId;
     exports.getGenOptions = getGenOptions;
     exports.getRevOptions = getRevOptions;
-
 });
