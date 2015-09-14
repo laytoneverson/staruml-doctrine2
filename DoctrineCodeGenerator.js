@@ -88,15 +88,53 @@ define(function(require, exports, module) {
             codeWriter,
             file;
 
-        // Package
-        if (elem instanceof type.UMLPackage) {
+        if (elem instanceof type.Project) {
+            // Projects are converted into project folders
             fullPath = path + "/" + elem.name.toUpperCamelCase();
+            directory = FileSystem.getDirectoryForPath(fullPath);
+            directory.create(function(err, stat) {
+                if (!err) {
+                    Async.doSequentially(
+                        elem.ownedElements,
+                        function(child) {
+                            return self.generate(child, fullPath, options);
+                        },
+                        false
+                        ).then(result.resolve, result.reject);
+                } else {
+                    result.reject(err);
+                }
+            });
+        } else if (elem instanceof type.UMLModel) {
+            // Models are converted into Bundles
+            fullPath = path + "/" + elem.name.toUpperCamelCase();
+            
+            // Adding bundle suffix
             if (options.bundleSuffix) {
                 fullPath += options.bundleSuffix;
             }
+            
+            // Adding folder for entities
             if (options.entityFolder) {
                 fullPath += "/" + options.entityFolder;
             }
+            directory = FileSystem.getDirectoryForPath(fullPath);
+            directory.create(function(err, stat) {
+                if (!err) {
+                    Async.doSequentially(
+                        elem.ownedElements,
+                        function(child) {
+                            return self.generate(child, fullPath, options);
+                        },
+                        false
+                        ).then(result.resolve, result.reject);
+                } else {
+                    result.reject(err);
+                }
+            });
+        } else if (elem instanceof type.UMLPackage) {
+            // Packages are converted into folders
+            fullPath = path + "/" + elem.name.toUpperCamelCase();
             directory = FileSystem.getDirectoryForPath(fullPath);
             directory.create(function(err, stat) {
                 if (!err) {
@@ -133,9 +171,8 @@ define(function(require, exports, module) {
                 file = FileSystem.getFileForPath(fullPath);
                 FileUtils.writeText(file, codeWriter.getData(), true).then(result.resolve, result.reject);
             }
-
-            // Interface
         } else if (elem instanceof type.UMLInterface) {
+            // Interface
             fullPath = path + "/" + elem.name + ".php";
             codeWriter = new CodeGenUtils.CodeWriter(this.getIndentString(options));
             codeWriter.writeLine("<?php\n");
@@ -144,9 +181,8 @@ define(function(require, exports, module) {
             this.writeInterface(codeWriter, elem, options);
             file = FileSystem.getFileForPath(fullPath);
             FileUtils.writeText(file, codeWriter.getData(), true).then(result.resolve, result.reject);
-
-            // Enum
         } else if (elem instanceof type.UMLEnumeration) {
+            // Enum
             fullPath = path + "/" + elem.name + ".php";
             codeWriter = new CodeGenUtils.CodeWriter(this.getIndentString(options));
             codeWriter.writeLine("<?php\n");
@@ -155,9 +191,8 @@ define(function(require, exports, module) {
             this.writeEnum(codeWriter, elem, options);
             file = FileSystem.getFileForPath(fullPath);
             FileUtils.writeText(file, codeWriter.getData(), true).then(result.resolve, result.reject);
-
-            // Others (Nothing generated.)
         } else {
+            // Others, nothing generated
             result.resolve();
         }
         return result.promise();
@@ -259,15 +294,21 @@ define(function(require, exports, module) {
     DoctrineCodeGenerator.prototype.getNamespaces = function(elem, options) {
         var _namespace = [];
         var _parent = [];
-        if (elem._parent instanceof type.UMLPackage && !(elem._parent instanceof type.UMLModel)) {
+        if (elem._parent instanceof type.Project) {
+            _namespace.push(elem._parent.name.toUpperCamelCase());
+            _parent = this.getNamespaces(elem._parent, options);
+        } else if (elem._parent instanceof type.UMLModel) {
             if (options.bundleSuffix) {
-                _namespace.push(elem._parent.name + options.bundleSuffix);
+                _namespace.push(elem._parent.name.toUpperCamelCase() + options.bundleSuffix);
             } else {
-                _namespace.push(elem._parent.name);
+                _namespace.push(elem._parent.name.toUpperCamelCase());
             }
             _parent = this.getNamespaces(elem._parent, options);
+        } else if (elem._parent instanceof type.UMLPackage) {
+            _namespace.push(elem._parent.name.toUpperCamelCase());
+            _parent = this.getNamespaces(elem._parent, options);
         }
-
+        
         return _.union(_parent, _namespace);
     };
 
@@ -358,7 +399,8 @@ define(function(require, exports, module) {
      * @param {Object} options     
      */
     DoctrineCodeGenerator.prototype.writeNamespaceDeclaration = function(codeWriter, elem, options) {
-        var path = this.getNamespaces(elem, options);
+        var path = this.getNamespaces(elem, options).join(NAMESPACE_SEPARATOR);
+        
         if (path) {
             codeWriter.writeLine("namespace " + path + ";\n");
         }
@@ -408,7 +450,7 @@ define(function(require, exports, module) {
         if (options.defaultPk
             && options.mapping === "0"
         ) {
-            var doc = "@ORM\\Id\n@ORM\\Column(type=integer)\n@ORM\\GeneratedValue(strategy=\"AUTO\")";
+            var doc = "@ORM\\Id\n@ORM\\Column(type=\"integer\")\n@ORM\\GeneratedValue(strategy=\"AUTO\")";
             this.writeDoc(codeWriter, doc, options);
             
             codeWriter.writeLine("protected $id;");
@@ -436,6 +478,9 @@ define(function(require, exports, module) {
                 }
                 if (elem.type == "string") {
                     terms.push("length=255");
+                }
+                if (elem.type == "decimal") {
+                    terms.push("scale=2");
                 }
                 if (elem.isUnique) {
                     terms.push("unique=\"true\"");
@@ -472,23 +517,22 @@ define(function(require, exports, module) {
         }
     };
     
-    DoctrineCodeGenerator.prototype.writeManyToOneAssociationDoc = function(codeWriter, elem, options) {
-        var doc = "@ManyToOne(targetEntity=\"" + elem.reference.name + "\")";
-        doc += "\n@JoinColumn(name=\"" + elem.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
+    DoctrineCodeGenerator.prototype.writeManyToOneAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
+        var doc = "@ManyToOne(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.toLowerCase().pluralize() + "\")";
+        doc += "\n@JoinColumn(name=\"" + targetEnd.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
         
         this.writeDoc(codeWriter, doc, options);
     }
     
-    DoctrineCodeGenerator.prototype.writeOneToManyAssociationDoc = function(codeWriter, elem, options) {
-        var doc = "@OneToMany(targetEntity=\"" + elem.reference.name + "\")";
-        doc += "\n@JoinColumn(name=\"" + elem.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
+    DoctrineCodeGenerator.prototype.writeOneToManyAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
+        var doc = "@OneToMany(targetEntity=\"" + targetEnd.reference.name + "\", mappedBy=\"" + sourceEnd.reference.name.toLowerCase() + "\")";
         
         this.writeDoc(codeWriter, doc, options);
     }
     
-    DoctrineCodeGenerator.prototype.writeManyToManyAssociationDoc = function(codeWriter, elem, options) {
-        var doc = "@ManyToMany(targetEntity=\"" + elem.reference.name + "\", inversedBy=\"\")";
-        doc += "\n@JoinTable(name=\"" + elem.reference.name.toUnderscore() + "_\")";
+    DoctrineCodeGenerator.prototype.writeManyToManyAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
+        var doc = "@ManyToMany(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.toLowerCase().pluralize() + "\")";
+        doc += "\n@JoinTable(name=\"" + sourceEnd.reference.name.toUnderscore() + "_" + targetEnd.reference.name.toLowerCase().pluralize() + "\")";
         
         this.writeDoc(codeWriter, doc, options);
     }
@@ -546,13 +590,13 @@ define(function(require, exports, module) {
                 //console.log(sourceEnd.reference.name + " " + targetEnd.reference.name);
                 switch (associationType) {
                     case "ManyToOne":
-                        this.writeManyToOneAssociationDoc(codeWriter, targetEnd, options);
+                        this.writeManyToOneAssociationDoc(codeWriter, sourceEnd, targetEnd, options);
                         break;
                     case "OneToMany":
-                        this.writeOneToManyAssociationDoc(codeWriter, targetEnd, options);
+                        this.writeOneToManyAssociationDoc(codeWriter, sourceEnd, targetEnd, options);
                         break;
                     case "ManyToMany":
-                        this.writeManyToManyAssociationDoc(codeWriter, targetEnd, options);
+                        this.writeManyToManyAssociationDoc(codeWriter, sourceEnd, targetEnd, options);
                         break;
                     case "OneToOne":
                         this.writeOneToOneAssociationDoc(codeWriter, targetEnd, options);
@@ -570,7 +614,7 @@ define(function(require, exports, module) {
             }
             // name
             if (associationType == "ManyToMany" || associationType == "OneToMany") {
-                terms.push("$" + targetEnd.reference.name.lowerFirstLetter() + "s");
+                terms.push("$" + targetEnd.reference.name.lowerFirstLetter().pluralize());
             } else {
                 terms.push("$" + targetEnd.reference.name.lowerFirstLetter());
             }            
@@ -578,7 +622,33 @@ define(function(require, exports, module) {
         }
     };
     
-    DoctrineCodeGenerator.prototype.writeSettersAndGetters = function(codeWriter, elem, options) {
+    DoctrineCodeGenerator.prototype.writePKGetter = function(codeWriter, elem, options) {
+        var terms = [];
+
+        // Documentation
+        var doc = "Get " + elem;
+            doc += "\n\n@return integer";
+        this.writeDoc(codeWriter, doc, options);
+
+        terms.push("public function");
+
+        // name
+        terms.push("get" + elem.capitalize() + "()");
+
+        // body
+        codeWriter.writeLine(terms.join(" "));
+        codeWriter.writeLine("{");
+        codeWriter.indent();
+
+        //spacification
+        codeWriter.writeLine("return $this->" + elem + ";");
+
+        codeWriter.outdent();
+        codeWriter.writeLine("}");
+        codeWriter.writeLine();
+    };
+    
+    DoctrineCodeGenerator.prototype.writeSetterAndGetter = function(codeWriter, elem, options) {
         if (elem.name.length > 0) {
             // SETTER
             var terms = [];
@@ -804,7 +874,7 @@ define(function(require, exports, module) {
         var i, len, terms = [];
 
         // PHPDoc + Annotations
-        var doc = this.getNamespaces(elem, options) + NAMESPACE_SEPARATOR + elem.name;
+        var doc = this.getNamespaces(elem, options).join(NAMESPACE_SEPARATOR) + NAMESPACE_SEPARATOR + elem.name;
         if (elem.documentation) {
             doc += "\n\n" + elem.documentation.trim();
         }
@@ -869,8 +939,10 @@ define(function(require, exports, module) {
         //codeWriter.writeLine();
 
         // Setters & Getters
+        var pk = options.defaultPk ? options.defaultPk : "id";
+        this.writePKGetter(codeWriter, pk, options);
         for (i = 0, len = elem.attributes.length; i < len; i++) {
-            this.writeSettersAndGetters(codeWriter, elem.attributes[i], options, false, false);
+            this.writeSetterAndGetter(codeWriter, elem.attributes[i], options, false, false);
         }
 
         // Methods
@@ -1095,18 +1167,22 @@ define(function(require, exports, module) {
         return this.charAt(0).toLowerCase() + this.slice(1).replace(/([A-Z])/g, function($1){return "_" + $1.toLowerCase();});
     };
     
-    String.prototype.capitalize = function() {
-        return this.charAt(0).toUpperCase() + this.slice(1);
+    String.prototype.toUpperCamelCase = function() {
+        return this.replace(/(\w)(\w*)/g, function(g0, g1, g2){
+            return g1.toUpperCase() + g2.toLowerCase();
+        }).replace(/\s/g, "");
     }
     
     String.prototype.lowerFirstLetter = function() {
         return this.charAt(0).toLowerCase() + this.slice(1);
     }
     
-    String.prototype.toUpperCamelCase = function() {
-        return this.replace(/(\w)(\w*)/g, function(g0, g1, g2){
-            return g1.toUpperCase() + g2.toLowerCase();
-        }).replace(/\s/g, "");
+    String.prototype.capitalize = function() {
+        return this.charAt(0).toUpperCase() + this.slice(1);
+    }
+    
+    String.prototype.pluralize = function() {
+        return this + "s";
     }
 
     /**

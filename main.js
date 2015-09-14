@@ -67,9 +67,11 @@ define(function (require, exports, module) {
 
         // If base is not assigned, popup ElementPicker
         if (!base) {
-            ElementPickerDialog.showDialog("Select a base model to generate codes", null, type.UMLPackage)
+            ElementPickerDialog.showDialog("Select a base model to generate codes", null, null)
                 .done(function (buttonId, selected) {
-                    if (buttonId === Dialogs.DIALOG_BTN_OK && selected) {
+                    if (buttonId === Dialogs.DIALOG_BTN_OK
+                        && selected
+                    ) {
                         base = selected;
 
                         // If path is not assigned, popup Open Dialog to select a folder
@@ -93,6 +95,15 @@ define(function (require, exports, module) {
         return result.promise();
     }
     
+    /**
+     * Display folder selection dialog.
+     * 
+     * @param {type} base
+     * @param {type} options
+     * @param {type} result
+     * 
+     * @returns {undefined}
+     */
     function _selectFolderDialog(base, options, result) {
         FileSystem.showOpenDialog(false, true, "Select a folder where generated codes to be located", null, null, function (err, files) {
             if (!err) {
@@ -103,6 +114,16 @@ define(function (require, exports, module) {
         });
     }
     
+    /**
+     * Check file validity.
+     * 
+     * @param {type} base
+     * @param {type} files
+     * @param {type} options
+     * @param {type} result
+     * 
+     * @returns {undefined}
+     */
     function _checkFile(base, files, options, result) {
         if (files.length > 0) {
             var path = files[0];
@@ -112,9 +133,19 @@ define(function (require, exports, module) {
         }
     }
     
+    /**
+     * Generate Doctrine entities.
+     * 
+     * @param {type} base
+     * @param {type} path
+     * @param {type} options
+     * @param {type} result
+     * 
+     * @returns {undefined}
+     */
     function _generate(base, path, options, result) {
         DoctrineCodeGenerator.generate(base, path, options).then(result.resolve, result.reject);
-        Dialogs.showInfoDialog("Entities have been successfully generated.");
+        Dialogs.showInfoDialog("Doctrine entities have been successfully generated.");
     }
 
     /**
@@ -167,5 +198,4 @@ define(function (require, exports, module) {
     menuItem.addMenuItem(CMD_DOCTRINE_GENERATE);
     menuItem.addMenuDivider();
     menuItem.addMenuItem(CMD_DOCTRINE_CONFIGURE);
-
 });

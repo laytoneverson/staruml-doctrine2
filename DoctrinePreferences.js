@@ -31,13 +31,13 @@ define(function (require, exports, module) {
         },
         "doctrine.gen.bundleSuffix": {
             text: "Bundle suffix",
-            description: "Suffix appended at the end of package name.",
+            description: "Suffix appended at the end of model name.",
             type: "String",
             default: "Bundle"
         },
         "doctrine.gen.entityFolder": {
-            text: "Entity directory",
-            description: "Will be added to the path of generated files.",
+            text: "Entities directory",
+            description: "Will be added to the path of generated entities.",
             type: "String",
             default: "Entity"
         },
