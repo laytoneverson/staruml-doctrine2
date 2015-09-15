@@ -29,23 +29,42 @@ define(function (require, exports, module) {
             text: "Doctrine 2 Code Generation",
             type: "Section"
         },
+        "doctrine.gen.baseFolder": {
+            text: "Base folder",
+            description: "Folder where files will be generated.",
+            type: "String",
+            default: "C:\\"
+        },
+        "doctrine.gen.entityFolder": {
+            text: "Entities folder",
+            description: "Will be added to the path of generated entities.",
+            type: "String",
+            default: "Entity"
+        },
         "doctrine.gen.bundleSuffix": {
             text: "Bundle suffix",
             description: "Suffix appended at the end of model name.",
             type: "String",
             default: "Bundle"
         },
-        "doctrine.gen.entityFolder": {
-            text: "Entities directory",
-            description: "Will be added to the path of generated entities.",
+        "doctrine.gen.baseNamespace": {
+            text: "Base namespace",
+            description: "Will be added at the beginning of generated files namespace.",
             type: "String",
-            default: "Entity"
+            default: ""
         },
         "doctrine.gen.defaultPk": {
             text: "Default PK",
             description: "Default primary key for entities.",
             type: "String",
             default: "id"
+        },
+        "doctrine.gen.columnFormat": {
+            text: "Column name format",
+            description: "Format used for database column names.",
+            type: "Dropdown",
+            options: [{text: "underscore_case", value: 0}, {text: "lowerCamelCase", value: 1}, {text: "UpperCamelCase", value: 2}],
+            default: 0
         },
         "doctrine.gen.unknownType": {
             text: "Unknown type",
@@ -84,7 +103,7 @@ define(function (require, exports, module) {
             type: "Number",
             default: 4
         },
-        "doctrine.rev": {
+        /*"doctrine.rev": {
             text: "Doctrine 2 Reverse Engineering",
             type: "Section"
         },
@@ -117,7 +136,7 @@ define(function (require, exports, module) {
             description: "Create a package structure diagram for all packages.",
             type: "Check",
             default: true
-        }
+        }*/
     };
     
     function getId() {
@@ -126,9 +145,12 @@ define(function (require, exports, module) {
 
     function getGenOptions() {
         return {
+            baseFolder         : PreferenceManager.get("doctrine.gen.baseFolder"),
             bundleSuffix       : PreferenceManager.get("doctrine.gen.bundleSuffix"),
             entityFolder       : PreferenceManager.get("doctrine.gen.entityFolder"),
+            baseNamespace      : PreferenceManager.get("doctrine.gen.baseNamespace"),
             defaultPk          : PreferenceManager.get("doctrine.gen.defaultPk"),
+            columnFormat       : PreferenceManager.get("doctrine.gen.columnFormat"),
             unknownType        : PreferenceManager.get("doctrine.gen.unknownType"),
             setterChaining     : PreferenceManager.get("doctrine.gen.setterChaining"),
             phpDoc             : PreferenceManager.get("doctrine.gen.phpDoc"),
@@ -138,7 +160,7 @@ define(function (require, exports, module) {
         };
     }
 
-    function getRevOptions() {
+    /*function getRevOptions() {
         return {
             association      : PreferenceManager.get("doctrine.rev.association"),
             publicOnly       : PreferenceManager.get("doctrine.rev.publicOnly"),
@@ -146,7 +168,7 @@ define(function (require, exports, module) {
             packageOverview  : PreferenceManager.get("doctrine.rev.packageOverview"),
             packageStructure : PreferenceManager.get("doctrine.rev.packageStructure")
         };
-    }
+    }*/
 
     AppInit.htmlReady(function () {
         PreferenceManager.register(preferenceId, "Doctrine 2", doctrinePreferences);
@@ -154,5 +176,5 @@ define(function (require, exports, module) {
 
     exports.getId         = getId;
     exports.getGenOptions = getGenOptions;
-    exports.getRevOptions = getRevOptions;
+    //exports.getRevOptions = getRevOptions;
 });

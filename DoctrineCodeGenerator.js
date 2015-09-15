@@ -38,7 +38,14 @@ define(function(require, exports, module) {
     var CodeGenUtils = require("CodeGenUtils");
 
     // constant for separate namespace on code
-    var NAMESPACE_SEPARATOR = "\\";
+    var NAMESPACE_SEPARATOR = "\\",
+        MULTIPLICITY_ONE = "1",
+        MULTIPLICITY_MANY = "*",
+        ASSOCIATION_MANY_TO_ONE = "ManyToOne",
+        ASSOCIATION_ONE_TO_MANY = "OneToMany",
+        ASSOCIATION_ONE_TO_ONE = "OneToOne",
+        ASSOCIATION_MANY_TO_MANY = "ManyToMany";
+    
 
     /**
      * Doctrine Code Generator
@@ -311,6 +318,19 @@ define(function(require, exports, module) {
         
         return _.union(_parent, _namespace);
     };
+    
+    /**
+     * 
+     * @param {type.Model} elem
+     * @return {Array}
+     */
+    DoctrineCodeGenerator.prototype.getCompleteNamespace = function(elem, options) {
+        var ns = this.getNamespaces(elem, options).join(NAMESPACE_SEPARATOR);
+        if (options.baseNamespace) {
+            ns = options.baseNamespace + NAMESPACE_SEPARATOR + ns;
+        }
+        return ns;
+    };    
 
     /**
      * Return type expression
@@ -342,7 +362,7 @@ define(function(require, exports, module) {
         }
         // multiplicity
         if (elem.multiplicity && _type !== "void") {
-            if (_.contains(["0..*", "1..*", "*"], elem.multiplicity.trim())) {
+            if (_.contains(["0..*", "1..*", MULTIPLICITY_MANY], elem.multiplicity.trim())) {
                 _type += "[]";
             }
         }
@@ -399,7 +419,7 @@ define(function(require, exports, module) {
      * @param {Object} options     
      */
     DoctrineCodeGenerator.prototype.writeNamespaceDeclaration = function(codeWriter, elem, options) {
-        var path = this.getNamespaces(elem, options).join(NAMESPACE_SEPARATOR);
+        var path = this.getCompleteNamespace(elem, options);
         
         if (path) {
             codeWriter.writeLine("namespace " + path + ";\n");
@@ -517,6 +537,16 @@ define(function(require, exports, module) {
         }
     };
     
+    /**
+     * Write ManyToOne association documentation
+     * 
+     * @param {type} codeWriter
+     * @param {type} sourceEnd
+     * @param {type} targetEnd
+     * @param {type} options
+     * 
+     * @returns {undefined}
+     */
     DoctrineCodeGenerator.prototype.writeManyToOneAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
         var doc = "@ManyToOne(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.toLowerCase().pluralize() + "\")";
         doc += "\n@JoinColumn(name=\"" + targetEnd.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
@@ -524,12 +554,32 @@ define(function(require, exports, module) {
         this.writeDoc(codeWriter, doc, options);
     }
     
+    /**
+     * Write OneToMany association documentation
+     * 
+     * @param {type} codeWriter
+     * @param {type} sourceEnd
+     * @param {type} targetEnd
+     * @param {type} options
+     * 
+     * @returns {undefined}
+     */
     DoctrineCodeGenerator.prototype.writeOneToManyAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
         var doc = "@OneToMany(targetEntity=\"" + targetEnd.reference.name + "\", mappedBy=\"" + sourceEnd.reference.name.toLowerCase() + "\")";
         
         this.writeDoc(codeWriter, doc, options);
     }
     
+    /**
+     * Write ManyToMany association documentation
+     * 
+     * @param {type} codeWriter
+     * @param {type} sourceEnd
+     * @param {type} targetEnd
+     * @param {type} options
+     * 
+     * @returns {undefined}
+     */
     DoctrineCodeGenerator.prototype.writeManyToManyAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
         var doc = "@ManyToMany(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.toLowerCase().pluralize() + "\")";
         doc += "\n@JoinTable(name=\"" + sourceEnd.reference.name.toUnderscore() + "_" + targetEnd.reference.name.toLowerCase().pluralize() + "\")";
@@ -537,6 +587,15 @@ define(function(require, exports, module) {
         this.writeDoc(codeWriter, doc, options);
     }
     
+    /**
+     * Write OneToOne association documentation
+     * 
+     * @param {type} codeWriter
+     * @param {type} elem
+     * @param {type} options
+     * 
+     * @returns {undefined}
+     */
     DoctrineCodeGenerator.prototype.writeOneToOneAssociationDoc = function(codeWriter, elem, options) {
         var doc = "@OneToOne(targetEntity=\"" + elem.reference.name + "\")";
         doc += "\n@JoinColumn(name=\"" + elem.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
@@ -544,19 +603,41 @@ define(function(require, exports, module) {
         this.writeDoc(codeWriter, doc, options);
     }
     
+    DoctrineCodeGenerator.prototype.getMultiplicity = function(elem) {
+        if (elem.multiplicity.substr(elem.multiplicity.length - 1) == MULTIPLICITY_MANY) {
+            return MULTIPLICITY_MANY;
+        } else if (elem.multiplicity.substr(elem.multiplicity.length - 1) == MULTIPLICITY_ONE) {
+            return MULTIPLICITY_ONE;
+        }
+    }
+    
+    /**
+     * 
+     * @param {type} sourceEnd
+     * @param {type} targetEnd
+     * @returns {String}
+     */
     DoctrineCodeGenerator.prototype.getAssociationType = function(sourceEnd, targetEnd) {
         var ret;
-        if (sourceEnd.multiplicity == "0..*" && targetEnd.multiplicity == "1") {
-            ret = "ManyToOne";
-        } else if (sourceEnd.multiplicity == "1" && targetEnd.multiplicity == "0..*") {
-            ret = "OneToMany";
-        } else if (sourceEnd.multiplicity == "0..*" && targetEnd.multiplicity == "0..*") {
-            ret = "ManyToMany";
-        } else if (sourceEnd.multiplicity == "1" && targetEnd.multiplicity == "1") {
-            ret = "OneToOne";
+        if (this.getMultiplicity(sourceEnd) == MULTIPLICITY_MANY
+            && this.getMultiplicity(targetEnd) == MULTIPLICITY_ONE
+        ) {
+            ret = ASSOCIATION_MANY_TO_ONE;
+        } else if (this.getMultiplicity(sourceEnd) == MULTIPLICITY_ONE
+            && this.getMultiplicity(targetEnd) == MULTIPLICITY_MANY
+        ) {
+            ret = ASSOCIATION_ONE_TO_MANY;
+        } else if (this.getMultiplicity(sourceEnd) == MULTIPLICITY_MANY
+            && this.getMultiplicity(targetEnd) == MULTIPLICITY_MANY
+        ) {
+            ret = ASSOCIATION_MANY_TO_MANY;
+        } else if (this.getMultiplicity(sourceEnd) == MULTIPLICITY_ONE
+            && this.getMultiplicity(targetEnd) == MULTIPLICITY_ONE
+        ) {
+            ret = ASSOCIATION_ONE_TO_ONE;
         } else {
             // Par défaut
-            ret = "OneToOne";
+            ret = ASSOCIATION_ONE_TO_ONE;
         }
         
         return ret;
@@ -589,16 +670,16 @@ define(function(require, exports, module) {
             if (options.mapping === "0") {
                 //console.log(sourceEnd.reference.name + " " + targetEnd.reference.name);
                 switch (associationType) {
-                    case "ManyToOne":
+                    case ASSOCIATION_MANY_TO_ONE:
                         this.writeManyToOneAssociationDoc(codeWriter, sourceEnd, targetEnd, options);
                         break;
-                    case "OneToMany":
+                    case ASSOCIATION_ONE_TO_MANY:
                         this.writeOneToManyAssociationDoc(codeWriter, sourceEnd, targetEnd, options);
                         break;
-                    case "ManyToMany":
+                    case ASSOCIATION_MANY_TO_MANY:
                         this.writeManyToManyAssociationDoc(codeWriter, sourceEnd, targetEnd, options);
                         break;
-                    case "OneToOne":
+                    case ASSOCIATION_ONE_TO_ONE:
                         this.writeOneToOneAssociationDoc(codeWriter, targetEnd, options);
                         break;
                 }
@@ -613,7 +694,8 @@ define(function(require, exports, module) {
                 terms.push(_modifiers.join(" "));
             }
             // name
-            if (associationType == "ManyToMany" || associationType == "OneToMany") {
+            if (associationType == ASSOCIATION_MANY_TO_MANY
+                || associationType == ASSOCIATION_ONE_TO_MANY) {
                 terms.push("$" + targetEnd.reference.name.lowerFirstLetter().pluralize());
             } else {
                 terms.push("$" + targetEnd.reference.name.lowerFirstLetter());
@@ -793,7 +875,6 @@ define(function(require, exports, module) {
         }
     };
 
-
     /**
      * Write Method Abstract for SuperClass
      * @param {StringWriter} codeWriter
@@ -874,7 +955,7 @@ define(function(require, exports, module) {
         var i, len, terms = [];
 
         // PHPDoc + Annotations
-        var doc = this.getNamespaces(elem, options).join(NAMESPACE_SEPARATOR) + NAMESPACE_SEPARATOR + elem.name;
+        var doc = this.getCompleteNamespace(elem, options) + NAMESPACE_SEPARATOR + elem.name;
         if (elem.documentation) {
             doc += "\n\n" + elem.documentation.trim();
         }

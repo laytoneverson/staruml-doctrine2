@@ -30,6 +30,7 @@ define(function (require, exports, module) {
     var AppInit             = app.getModule("utils/AppInit"),
         Repository          = app.getModule("core/Repository"),
         Engine              = app.getModule("engine/Engine"),
+        ProjectManager      = app.getModule("engine/ProjectManager"),
         Commands            = app.getModule("command/Commands"),
         CommandManager      = app.getModule("command/CommandManager"),
         MenuManager         = app.getModule("menu/MenuManager"),
@@ -64,10 +65,21 @@ define(function (require, exports, module) {
 
         // If options is not passed, get from preference
         options = options || DoctrinePreferences.getGenOptions();
-
+        
+        // Get project specific options
+        var project = ProjectManager.getProject();
+        var specificOptions;
+        if (project) {
+            _.each(project.tags, function(tag) {
+                if (tag.name.toLowerCase() == "doctrine2") {
+                    specificOptions = tag.value;
+                }
+            });
+        }
+        
         // If base is not assigned, popup ElementPicker
         if (!base) {
-            ElementPickerDialog.showDialog("Select a base model to generate codes", null, null)
+            ElementPickerDialog.showDialog("Select a base model to generate files", null, null)
                 .done(function (buttonId, selected) {
                     if (buttonId === Dialogs.DIALOG_BTN_OK
                         && selected
@@ -76,7 +88,13 @@ define(function (require, exports, module) {
 
                         // If path is not assigned, popup Open Dialog to select a folder
                         if (!path) {
-                            _selectFolderDialog(base, options, result);
+                            if (!options.baseFolder) {
+                                _selectFolderDialog(base, options, result);
+                            } else {
+                                path = options.baseFolder.replace('\\', '/');
+                                var files = [path];
+                                _checkFile(base, files, options, result);
+                            }
                         } else {
                             _generate(base, path, options, result);
                         }
@@ -87,7 +105,13 @@ define(function (require, exports, module) {
         } else {
             // If path is not assigned, popup Open Dialog to select a folder
             if (!path) {
-                _selectFolderDialog(base, options, result);
+                if (!options.baseFolder) {
+                    _selectFolderDialog(base, options, result);
+                } else {
+                    path = options.baseFolder.replace('\\', '/');
+                    var files = [path];
+                    _checkFile(base, files, options, result);
+                }
             } else {
                 _generate(base, path, options, result);
             }
@@ -105,7 +129,7 @@ define(function (require, exports, module) {
      * @returns {undefined}
      */
     function _selectFolderDialog(base, options, result) {
-        FileSystem.showOpenDialog(false, true, "Select a folder where generated codes to be located", null, null, function (err, files) {
+        FileSystem.showOpenDialog(false, true, "Select a base folder where generated files to be located", null, null, function (err, files) {
             if (!err) {
                 _checkFile(base, files, options, result);
             } else {
