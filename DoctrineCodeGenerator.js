@@ -486,11 +486,18 @@ define(function(require, exports, module) {
     DoctrineCodeGenerator.prototype.writeMemberVariable = function(codeWriter, elem, options) {
         if (elem.name.length > 0) {
             var terms = [];
+            var elemType = "";
+            
+            if (this.getType(elem, options) == "datetime") {
+                elemType = "\\DateTime";
+            } else {
+                elemType = this.getType(elem, options);
+            }
             
             // PHPDoc + Annotations
-            var doc = "@var " + this.getType(elem, options) + " " + elem.documentation.trim();
+            var doc = "@var " + elemType + " " + elem.documentation.trim();
             if (options.mapping === "0") {
-                terms.push("name=\"" + elem.name + "\"");
+                terms.push("name=\"" + elem.name.toUnderscore() + "\"");
                 if (elem.type) {
                     terms.push("type=\"" + elem.type + "\"");
                 } else {
@@ -548,8 +555,8 @@ define(function(require, exports, module) {
      * @returns {undefined}
      */
     DoctrineCodeGenerator.prototype.writeManyToOneAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
-        var doc = "@ManyToOne(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.toLowerCase().pluralize() + "\")";
-        doc += "\n@JoinColumn(name=\"" + targetEnd.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
+        var doc = "@ORM\ManyToOne(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.toLowerCase().pluralize() + "\")";
+        doc += "\n@ORM\JoinColumn(name=\"" + targetEnd.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
         
         this.writeDoc(codeWriter, doc, options);
     }
@@ -565,7 +572,7 @@ define(function(require, exports, module) {
      * @returns {undefined}
      */
     DoctrineCodeGenerator.prototype.writeOneToManyAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
-        var doc = "@OneToMany(targetEntity=\"" + targetEnd.reference.name + "\", mappedBy=\"" + sourceEnd.reference.name.toLowerCase() + "\")";
+        var doc = "@ORM\OneToMany(targetEntity=\"" + targetEnd.reference.name + "\", mappedBy=\"" + sourceEnd.reference.name.toLowerCase() + "\")";
         
         this.writeDoc(codeWriter, doc, options);
     }
@@ -581,8 +588,9 @@ define(function(require, exports, module) {
      * @returns {undefined}
      */
     DoctrineCodeGenerator.prototype.writeManyToManyAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
-        var doc = "@ManyToMany(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.toLowerCase().pluralize() + "\")";
-        doc += "\n@JoinTable(name=\"" + sourceEnd.reference.name.toUnderscore() + "_" + targetEnd.reference.name.toLowerCase().pluralize() + "\")";
+        
+        var doc = "@ORM\ManyToMany(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.toLowerCase().pluralize() + "\")";
+        doc += "\n@ORM\JoinTable(name=\"" + sourceEnd.reference.name.toUnderscore() + "_" + targetEnd.reference.name.toLowerCase().pluralize() + "\")";
         
         this.writeDoc(codeWriter, doc, options);
     }
@@ -596,9 +604,15 @@ define(function(require, exports, module) {
      * 
      * @returns {undefined}
      */
-    DoctrineCodeGenerator.prototype.writeOneToOneAssociationDoc = function(codeWriter, elem, options) {
-        var doc = "@OneToOne(targetEntity=\"" + elem.reference.name + "\")";
-        doc += "\n@JoinColumn(name=\"" + elem.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
+    DoctrineCodeGenerator.prototype.writeOneToOneAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
+        var doc;
+        
+        if (sourceEnd.isID) {
+            doc = "@ORM\OneToOne(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.lowerFirstLetter() + "\")";
+            doc += "\n@ORM\JoinColumn(name=\"" + targetEnd.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
+        } else {
+            doc = "@ORM\OneToOne(targetEntity=\"" + targetEnd.reference.name + "\", mappedBy=\"" + sourceEnd.reference.name.lowerFirstLetter() + "\")";
+        }
         
         this.writeDoc(codeWriter, doc, options);
     }
@@ -680,7 +694,7 @@ define(function(require, exports, module) {
                         this.writeManyToManyAssociationDoc(codeWriter, sourceEnd, targetEnd, options);
                         break;
                     case ASSOCIATION_ONE_TO_ONE:
-                        this.writeOneToOneAssociationDoc(codeWriter, targetEnd, options);
+                        this.writeOneToOneAssociationDoc(codeWriter, sourceEnd, targetEnd, options);
                         break;
                 }
             }
@@ -734,14 +748,18 @@ define(function(require, exports, module) {
         if (elem.name.length > 0) {
             // SETTER
             var terms = [];
+            var elemType = "";
             
             // Documentation
             var doc =  "Set " + elem.name;
-            if (elem.type) {
-                doc += "\n\n\@param " + elem.type + " " + elem.name + " " + elem.documentation.trim();
+            if (elem.type == "datetime") {
+                elemType = "\\DateTime";
+            } else if (elem.type) {
+                elemType = elem.type;
             } else {
-                doc += "\n\n\@param type " + elem.name + " " + elem.documentation.trim();
+                elemType = "type";
             }
+            doc += "\n\n\@param " + elemType + " " + elem.name + " " + elem.documentation.trim();
             this.writeDoc(codeWriter, doc, options);
 
             terms.push("public function");
@@ -963,7 +981,7 @@ define(function(require, exports, module) {
             doc += "\n@author " + ProjectManager.getProject().author;
         }
         if (options.mapping === "0") {
-            doc += "\n\n@ORM\\Entity\n@ORM\\Table(name=\"" + elem.name.toUnderscore() + "\")";
+            doc += "\n\n@ORM\\Entity(repositoryClass=\"\")\n@ORM\\Table(name=\"" + elem.name.toUnderscore() + "\")";
         }
         this.writeDoc(codeWriter, doc, options);
 
