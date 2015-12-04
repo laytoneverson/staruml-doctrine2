@@ -113,7 +113,7 @@ define(function(require, exports, module) {
                 }
             });
         } else if (elem instanceof type.UMLModel) {
-            // Models are converted into Bundles
+            // Models are converted into bundles (Symfony2)
             fullPath = path + "/" + elem.name.toUpperCamelCase();
             
             // Adding bundle suffix
@@ -555,8 +555,13 @@ define(function(require, exports, module) {
      * @returns {undefined}
      */
     DoctrineCodeGenerator.prototype.writeManyToOneAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
+<<<<<<< HEAD
         var doc = "@ORM\ManyToOne(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.toLowerCase().pluralize() + "\")";
         doc += "\n@ORM\JoinColumn(name=\"" + targetEnd.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
+=======
+        var doc = "@ORM\\ManyToOne(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.toLowerCase().pluralize() + "\")";
+        doc += "\n@ORM\\JoinColumn(name=\"" + targetEnd.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
+>>>>>>> origin/master
         
         this.writeDoc(codeWriter, doc, options);
     }
@@ -572,7 +577,11 @@ define(function(require, exports, module) {
      * @returns {undefined}
      */
     DoctrineCodeGenerator.prototype.writeOneToManyAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
+<<<<<<< HEAD
         var doc = "@ORM\OneToMany(targetEntity=\"" + targetEnd.reference.name + "\", mappedBy=\"" + sourceEnd.reference.name.toLowerCase() + "\")";
+=======
+        var doc = "@ORM\\OneToMany(targetEntity=\"" + targetEnd.reference.name + "\", mappedBy=\"" + sourceEnd.reference.name.toLowerCase() + "\")";
+>>>>>>> origin/master
         
         this.writeDoc(codeWriter, doc, options);
     }
@@ -588,9 +597,14 @@ define(function(require, exports, module) {
      * @returns {undefined}
      */
     DoctrineCodeGenerator.prototype.writeManyToManyAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
+<<<<<<< HEAD
         
         var doc = "@ORM\ManyToMany(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.toLowerCase().pluralize() + "\")";
         doc += "\n@ORM\JoinTable(name=\"" + sourceEnd.reference.name.toUnderscore() + "_" + targetEnd.reference.name.toLowerCase().pluralize() + "\")";
+=======
+        var doc = "@ORM\\ManyToMany(targetEntity=\"" + targetEnd.reference.name + "\", inversedBy=\"" + sourceEnd.reference.name.toLowerCase().pluralize() + "\")";
+        doc += "\n@ORM\\JoinTable(name=\"" + sourceEnd.reference.name.toUnderscore() + "_" + targetEnd.reference.name.toLowerCase().pluralize() + "\")";
+>>>>>>> origin/master
         
         this.writeDoc(codeWriter, doc, options);
     }
@@ -604,6 +618,7 @@ define(function(require, exports, module) {
      * 
      * @returns {undefined}
      */
+<<<<<<< HEAD
     DoctrineCodeGenerator.prototype.writeOneToOneAssociationDoc = function(codeWriter, sourceEnd, targetEnd, options) {
         var doc;
         
@@ -613,6 +628,11 @@ define(function(require, exports, module) {
         } else {
             doc = "@ORM\OneToOne(targetEntity=\"" + targetEnd.reference.name + "\", mappedBy=\"" + sourceEnd.reference.name.lowerFirstLetter() + "\")";
         }
+=======
+    DoctrineCodeGenerator.prototype.writeOneToOneAssociationDoc = function(codeWriter, elem, options) {
+        var doc = "@ORM\\OneToOne(targetEntity=\"" + elem.reference.name + "\")";
+        doc += "\n@ORM\\JoinColumn(name=\"" + elem.reference.name.toUnderscore() + "_id\", referencedColumnName=\"" + options.defaultPk + "\")";
+>>>>>>> origin/master
         
         this.writeDoc(codeWriter, doc, options);
     }
@@ -718,6 +738,15 @@ define(function(require, exports, module) {
         }
     };
     
+    /**
+     * Write getter for primary key
+     * 
+     * @param {type} codeWriter
+     * @param {type} elem
+     * @param {type} options
+     * 
+     * @returns {undefined}
+     */
     DoctrineCodeGenerator.prototype.writePKGetter = function(codeWriter, elem, options) {
         var terms = [];
 
